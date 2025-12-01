@@ -26,18 +26,35 @@ class HTTP_Server():
         )
         return None
     
-    def add_Route(self, path:str, handler:callable, response_Body:str, response_Content_Type: str ="text/html", body_Needed: bool = False) -> None:
+    def add_Route(self, path:str, handler:callable, method_defined:str, response_Body:str, response_Content_Type: str ="text/html", body_Needed: bool = False, easy_Form_Handler: bool = False) -> None:
         # checking if valid response Content Type
         if response_Content_Type in self.basic_content_types:
             pass
         else:
             response_Content_Type = "text/html"
         
-        # updating dict
-        self.Routes[path] = [handler, response_Body, response_Content_Type, body_Needed]
+        # defining easy_Form_Handler
+        self.easy_Form_Handler = easy_Form_Handler
+
+        # updating dict | method route gets called with
+        self.Routes[path] = [handler, response_Body, method_defined, response_Content_Type, body_Needed]
         self.existingRoute = True
         print(self.Routes)
         return None
+    
+    # splits Form body like name=Tim&comment=AHH into dict
+    def Form_Handler(self, form_Body:str) -> dict:
+        # splited_Form_Elements: dict = {key: val for x in form_Body.split("&") for key, val in x.split("=")}
+
+        splited_Form_Elements: dict = {}
+        splitedBody: list = form_Body.split("&")
+        for x in splitedBody:
+            key, val = x.split("=")
+            splited_Form_Elements[key] = val
+        
+        return splited_Form_Elements
+            
+        
     
     def call_Route(self, request:bytes) -> bytes:
         lines: list = request.decode().split("\r\n")
@@ -54,6 +71,7 @@ class HTTP_Server():
         # get only body from list
         seperation: int = lines.index("")
         body: str | None = lines[seperation+1]
+        print(f"--body--{body}--")
 
         # defining
         requestLine: list = header[0].split(" ")
@@ -65,13 +83,27 @@ class HTTP_Server():
 
         # calling Route and defining variables
         if (rout in self.Routes) and (method in self.Methods):
-            handler, response_Body, response_Content_Type, body_Needed = self.Routes[rout]
+            handler, response_Body, method_defined, response_Content_Type, body_Needed = self.Routes[rout]
+
+            # checking if the request method is the same as the defiened method
+            if method_defined == method_defined:
+                pass
+            
         else:
             print("Page Not found")
             return self.page_Not_Found_Response.encode()
         
-        # calling Function if Bofy is needed with body parameter
-        handler(body) if body_Needed and body else handler()
+        # calling Function if Bod.y is needed with body parameter
+        if body_Needed:
+            
+            # if easy form Handler
+            if self.easy_Form_Handler:
+                handler(self.Form_Handler(body))
+
+            else:
+                handler(body)
+        else:
+            handler()
         
         # making full HTTP response
         HTTP_Response_str: str = (
@@ -111,15 +143,19 @@ class HTTP_Server():
 myServer = HTTP_Server("127.0.0.1", 8000)
 print(myServer)
 
-def myHandler(body):
+def myHandler():
     print("Handler...")
+
+def myHandler2(body):
+    print("Handler2...")
     print(f"Body: {body}")
 
 with open("index.html", "r") as f:
     html = f.read()
 
 # Defining my Routes
-myServer.add_Route("/", myHandler, html, body_Needed=True)
+myServer.add_Route(path="/", handler=myHandler, method_defined="GET", response_Body=html, body_Needed=False)
+myServer.add_Route(path="/Comment", handler=myHandler2, method_defined="POST", response_Body=html, body_Needed=True)
 
 # Booting Server
 myServer.boot_Server()
@@ -140,3 +176,5 @@ myServer.boot_Server()
 # @app.get("/")
 # def home():
 #     return {"message": "Welcome to the Randomizer API"}
+
+
