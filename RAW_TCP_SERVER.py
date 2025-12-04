@@ -2,9 +2,11 @@ import socket
 from Content_types import basic_content_types
 
 class HTTP_Server():
-    def __init__(self, host:str, port:int, bufsize: int = 1024, backlog: int = 5, response_Body_If_404:str | None = None) -> None:
+    def __init__(self, host:str, port:int,status_Code: int=200, status_Msg: str= "Ok", bufsize: int = 1024, backlog: int = 5, response_Body_If_404:str | None = None) -> None:
         self.host = host
         self.port = port
+        self.status_Code = status_Code
+        self.status_Msg = status_Msg
         self.bufsize = bufsize
         self.backlog = backlog
         self.Routes = {}
@@ -107,7 +109,7 @@ class HTTP_Server():
         
         # making full HTTP response
         HTTP_Response_str: str = (
-            f"HTTP/1.1 200 OK\r\n"
+            f"HTTP/1.1 {self.status_Code} {self.status_Msg}\r\n"
             f"Content-Type: {response_Content_Type}\r\n"
             "\r\n"
             f"{response_Body}"
@@ -153,9 +155,12 @@ def myHandler2(body):
 with open("index.html", "r") as f:
     html = f.read()
 
+with open("yourPost.html", "r") as f:
+    htmlPost = f.read()
+
 # Defining my Routes
 myServer.add_Route(path="/", handler=myHandler, method_defined="GET", response_Body=html, body_Needed=False)
-myServer.add_Route(path="/Comment", handler=myHandler2, method_defined="POST", response_Body=html, body_Needed=True)
+myServer.add_Route(path="/Comment", handler=myHandler2, method_defined="POST", response_Body=htmlPost, body_Needed=True, easy_Form_Handler=True)
 
 # Booting Server
 myServer.boot_Server()

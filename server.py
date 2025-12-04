@@ -106,7 +106,7 @@ http_Server = httpServer("127.0.0.1", 8000)
 
 http_Server.run()
 
-print(http_Server.get_response("text/html", "<h1>Recieved</h1>", http_Server.client_socket, 200, "OK", send=False))
+# print(http_Server.get_response("text/html", "<h1>Recieved</h1>", http_Server.client_socket, 200, "OK", send=False))
 
     
     
@@ -155,3 +155,25 @@ print(http_Server.get_response("text/html", "<h1>Recieved</h1>", http_Server.cli
     #         blackjackfile = blackjackfile.replace("{{ number }}",f"<h2>{str(number)}</h2>")
     #         blackjackfile = blackjackfile.replace("{{ status }}",str(status)) 
     #     self.client_socket.sendall(b"""HTTP/1.1 200 OK\r\nContent-Type: text/html\r\n\r\n"""+blackjackfile.encode())
+
+
+
+
+    # # get lines
+    #     lines = Container["lines"]
+    #     print(lines)
+    #     # get header
+    #     header = Container["header"]
+    #     print(header)
+    #     # get body
+    #     body = Container["body"]
+    #     print(f"--body--{body}--")
+    #     # get Request Line
+    #     requestLine = Container["requestLine"]
+    #     print("Request Line: "+str(requestLine))
+    #     # get Method
+    #     method = Container["method"]
+    #     print("Method: "+method)
+    #     # get rout
+    #     rout = Container["rout"]
+    #     print("Request rout: "+rout)
