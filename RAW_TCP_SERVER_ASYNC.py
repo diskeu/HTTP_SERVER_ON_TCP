@@ -26,7 +26,7 @@ class HTTP_Server():
         self.page_Not_Found_Response =(
             f"HTTP/1.1 404 not Found\r\n"
             f"Content-Type: text/html\r\n"
-            "\r\n"
+            "\r\n\r\n"
             f"{self.response_Body_If_404}"
         )
 
@@ -37,7 +37,7 @@ class HTTP_Server():
         self.timeout_Response =(
             f"HTTP/1.1 408 Request Timeout\r\n"
             f"Content-Type: text/html\r\n"
-            "\r\n"
+            "\r\n\r\n"
             f"{self.response_Body_If_Timeout}"
         )
         
@@ -56,7 +56,6 @@ class HTTP_Server():
         # updating dict | method route gets called with
         self.Routes[path] = [handler, response_Body, method_defined, response_Content_Type, body_Needed]
         self.existingRoute = True
-        print(self.Routes)
         return None
     
     # splits Form body like name=Tim&comment=AHH into dict
@@ -68,6 +67,7 @@ class HTTP_Server():
         for x in splitedBody:
             key, val = x.split("=")
             splited_Form_Elements[key] = val
+        print(splited_Form_Elements)
         
         return splited_Form_Elements
             
@@ -99,18 +99,27 @@ class HTTP_Server():
             print("Method: "+method)
             print("Request rout: "+rout)
             
-             # calling Route and defining variables
+            # Function that returns Response_Container with page_Not_Found_Response
+            def page_Not_Found_Action():
+                print("Page Not found")
+                Response_Container["HTTP_Response_binary"] = self.page_Not_Found_Response.encode()
+                return # leaving function
+
+            # calling Route and defining variables and checking if the request method is the same as the defiened method
             if (rout in self.Routes) and (method in self.Methods):
                 handler, response_Body, method_defined, response_Content_Type, body_Needed = self.Routes[rout]
 
-            # checking if the request method is the same as the defiened method
-                if method == method_defined:
-                    pass
+                if method != method_defined:
+                    print(f"Definied Method = {method_defined}")
+                    print(f"Used Method = {method}")
+                    page_Not_Found_Action()
+                    return 
             
             else:
-                print("Page Not found")
-                Response_Container["HTTP_Response_binary"] = self.page_Not_Found_Response.encode()
-        
+                page_Not_Found_Action()
+                return
+                
+
             # calling Function if Body is needed with body parameter
             if body_Needed:
                 
@@ -133,7 +142,11 @@ class HTTP_Server():
             )
 
             HTTP_Response_binary: bytes = HTTP_Response_str.encode()
+            print("------")
+            print(HTTP_Response_binary)
+            print("------")
             Response_Container["HTTP_Response_binary"] = HTTP_Response_binary
+            return
         
         # defining Response container
         Response_Container = {}
@@ -161,7 +174,6 @@ class HTTP_Server():
 
                 HTTP_Response_binary: bytes = await self.call_Route(request)
                 
-                print(HTTP_Response_binary)
                 writer.write(HTTP_Response_binary)
                 await writer.drain()
                 
