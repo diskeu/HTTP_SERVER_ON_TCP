@@ -2,7 +2,7 @@ import asyncio
 import httpx
 import time
 
-URL = "http://127.0.0.1:8000/test"
+URL = "http://127.0.0.1:8000/"
 NUM_REQUESTS = 5
 WAIT_TIME = 3  # geschätzte Zeit einer einzelnen Anfrage, z.B. für künstliche Delay
 
