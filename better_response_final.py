@@ -2,9 +2,14 @@ import socket
 import asyncio
 import threading
 import time
+import datetime
 import queue
 import inspect
+import csv
+import os
+import mimetypes
 from Content_types import basic_content_types
+from encoding_needed import mimetype_encoding_needed
 from concurrent.futures import Future
 
 class HTTP_Server():
@@ -18,6 +23,7 @@ class HTTP_Server():
         self.Methods = ["GET", "POST", "PUT", "DELETE"]
         self.existingRoute = False
         self.basic_content_types = basic_content_types
+        self.encoding_needed = mimetype_encoding_needed
         self.response_Body_If_404 = response_Body_If_404
         self.timeout = timeout
 
@@ -56,7 +62,7 @@ class HTTP_Server():
         # updating dict | method route gets called with
         self.Routes[path] = [handler, method_defined, response_Content_Type, body_Needed, easy_Form_Handler]
         self.existingRoute = True
-        return None
+        return None        
     
     # splits Form body like name=Tim&comment=AHH into dict
     def Form_Handler(self, form_Body:str) -> dict:
@@ -70,10 +76,23 @@ class HTTP_Server():
         print(splited_Form_Elements)
         
         return splited_Form_Elements
-            
+    
+    def log_request(self, Time, status_Code: int, Method: str, Route: str, IP: str) -> None:
+        line = [Time, status_Code, Method, Route, IP]
+        with open("log.csv", "a", newline="") as f:
+            csv_Writer = csv.writer(f)
+            csv_Writer.writerow(line)
+    
+    def mount_static(self, rout: str, path: str) -> None:
+        # adds a route for every file in the directory
+        for x in os.listdir(path):
+            file_Type, _ = mimetypes.guess_file_type(path+x)
+            with open(path+x, "rb") as f:
+                content = f.read()
+            self.add_Route(path=rout+"/"+x, handler=lambda content=content: content, method_defined="GET", response_Content_Type=file_Type)        
         
     # gets items from request makes response, gives back future
-    def call_Route(self, request:bytes, response_Future) -> Future[any]:
+    def call_Route(self, request:bytes, response_Future, client_ip) -> Future[any]:
         # spliting lines from request
         lines: list = request.decode().split("\r\n")
 
@@ -100,7 +119,16 @@ class HTTP_Server():
         # Function that returns Response_Container with page_Not_Found_Response
         def page_Not_Found_Action():
             print("Page Not found")
-            response_Future.set_result(self.page_Not_Found_Response.encode)
+
+            # defining datetime
+            now = datetime.datetime.now()
+            request_Time = now.strftime("%Y:%m:%d - %X")
+
+            # calling function that writes in log
+            self.log_request(request_Time, 404, method, rout, client_ip)
+
+            # seting future
+            response_Future.set_result(self.page_Not_Found_Response.encode())
             return # leaving function
 
         # calling Route and defining variables and checking if the request method is the same as the defiened method
@@ -119,7 +147,7 @@ class HTTP_Server():
             
         # checking the type of Function and getting response Body from it
         # calling Function if Body is needed with body parameter
-        if asyncio.iscoroutinefunction(handler):
+        if inspect.iscoroutinefunction(handler):
             if body_Needed:
                 
                 # if easy form Handler
@@ -141,22 +169,33 @@ class HTTP_Server():
                     response_Body = handler(body)
             else:
                 response_Body = handler()
-        # defining Response Body Length
-        content_Length = len(response_Body.encode("utf-8")) if response_Body else 0
-                    
-        # making full HTTP response
-        HTTP_Response_str: str = (
+
+        # defining Response Body and Length
+        if type(response_Body) == str:
+            response_Body = response_Body.encode()
+        content_Length = len(response_Body) if response_Body else 0
+        HTTP_Response_Body_bytes: bytes = response_Body
+
+        # making HTTP response Header
+        HTTP_Response_Header_str: str = (
             f"HTTP/1.1 {self.status_Code} {self.status_Msg}\r\n"
             f"Content-Type: {response_Content_Type}\r\n"
             f"Content-Length: {content_Length}"
             "\r\n\r\n"
-            f"{response_Body}"
         )
 
-        HTTP_Response_binary: bytes = HTTP_Response_str.encode()
-        print("------")
-        print(HTTP_Response_binary)
-        print("------")
+        HTTP_Response_Header_bytes: bytes = HTTP_Response_Header_str.encode()
+
+        HTTP_Response_binary: bytes = HTTP_Response_Header_bytes + HTTP_Response_Body_bytes
+
+        # defining datetime
+        now = datetime.datetime.now()
+        request_Time = now.strftime("%Y:%m:%d - %X")
+
+        # calling function that writes in log
+        self.log_request(request_Time, 200, method, rout, client_ip)
+
+        # seting future
         response_Future.set_result(HTTP_Response_binary)
         return # leaving thread
     
@@ -169,12 +208,15 @@ class HTTP_Server():
                 # if client disconnects break
                 if not request:
                     break
-    
+                
+                # defining IP adress
+                client_ip = writer.get_extra_info("peername")[0]
+                
                 # defining Future
                 response_Future: Future[any] = Future()
 
                 # starting thread
-                thread: threading.Thread = threading.Thread(target=self.call_Route, args=(request, response_Future))
+                thread: threading.Thread = threading.Thread(target=self.call_Route, args=(request, response_Future, client_ip))
                 thread.start()
 
                 # waiting for future to respond
@@ -216,28 +258,32 @@ with open("index.html", "r") as f:
 with open("yourPost.html", "r") as f:
     htmlPost = f.read()
 
-async def slow():
-    return htmlPost
-
 def myHandler():
     print("Handler...")
-    return html
+    return html.encode()
 
 def myHandler2(body):
     print("Handler2...")
     print(f"Body: {body}")
-    return htmlPost
+    return f"<h1>Thank you for your post {body["name"]}</h1>"
 
-async def myHandler3():
+async def myHandler3(body):
     await asyncio.sleep(7)
     print("Handler3...")
-    return html
+    return htmlPost.encode()
+
+def myHandler4():
+    with open("static/php.png", "rb") as f:
+        img = f.read()
+    return {"name": True}
 
 # Defining my Routes
+myServer.mount_static("/static", "static/")
 myServer.add_Route(path="/", handler=myHandler, method_defined="GET", body_Needed=False)
 myServer.add_Route(path="/test", handler=myHandler, method_defined="GET", body_Needed=False)
 myServer.add_Route(path="/Comment", handler=myHandler2, method_defined="POST", body_Needed=True, easy_Form_Handler=True)
-myServer.add_Route(path="/slow", handler=myHandler3, method_defined="GET", body_Needed=False, easy_Form_Handler=False)
+myServer.add_Route(path="/slow", handler=myHandler3, method_defined="GET", body_Needed=True, easy_Form_Handler=False)
+# myServer.add_Route(path="/static/img", handler=myHandler4, method_defined="GET", response_Content_Type="image/png")
 # myServer.add_Route(path="/slow", handler=slow, method_defined="GET", response_Body="HTTP/1.1 200 OK\r\n\r\nSlow Response", body_Needed=False, easy_Form_Handler=False)
 
 # Booting Server
